@@ -1,0 +1,859 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GitHub Repository Analyzer</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            /* GitHub color palette - Light mode */
+            --color-bg-default: #ffffff;
+            --color-bg-secondary: #f6f8fa;
+            --color-border: #e1e4e8;
+            --color-text-primary: #24292e;
+            --color-text-secondary: #586069;
+            --color-link: #0366d6;
+            --color-accent: #2188ff;
+            --color-success: #2ea44f;
+            --color-danger: #cb2431;
+            --color-border-radius: 6px;
+        }
+        
+        /* Dark mode theme variables */
+        [data-theme="dark"] {
+            --color-bg-default: #0d1117;
+            --color-bg-secondary: #161b22;
+            --color-border: #30363d;
+            --color-text-primary: #c9d1d9;
+            --color-text-secondary: #8b949e;
+            --color-link: #58a6ff;
+            --color-accent: #1f6feb;
+            --color-success: #2ea043;
+            --color-danger: #f85149;
+            --color-chart-grid: #30363d;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+            color: var(--color-text-primary);
+            background-color: var(--color-bg-secondary);
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+        
+        .navbar {
+            background-color: #24292e !important;
+            padding: 16px 0;
+            border-bottom: 1px solid var(--color-border);
+        }
+        
+        .navbar-brand {
+            font-weight: 600;
+            font-size: 20px;
+        }
+        
+        .card {
+            border: 1px solid var(--color-border);
+            border-radius: var(--color-border-radius);
+            box-shadow: 0 1px 0 rgba(27, 31, 35, 0.04);
+            margin-bottom: 16px;
+            background-color: var(--color-bg-default);
+            transition: background-color 0.3s ease, border-color 0.3s ease;
+        }
+        
+        .card-header {
+            background-color: var(--color-bg-secondary);
+            border-bottom: 1px solid var(--color-border);
+            font-weight: 600;
+            padding: 12px 16px;
+            color: var(--color-text-primary);
+            transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+        }
+        
+        .card-header.bg-primary {
+            background-color: #24292e !important;
+            color: white;
+        }
+        
+        .card-body {
+            padding: 16px;
+            background-color: var(--color-bg-default);
+            transition: background-color 0.3s ease;
+        }
+        
+        .form-control {
+            background-color: var(--color-bg-default);
+            border-color: var(--color-border);
+            color: var(--color-text-primary);
+            transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+        }
+        
+        .form-control:focus {
+            background-color: var(--color-bg-default);
+            border-color: var(--color-accent);
+            color: var(--color-text-primary);
+            box-shadow: 0 0 0 3px rgba(3, 102, 214, 0.3);
+        }
+        
+        .form-text {
+            color: var(--color-text-secondary);
+        }
+        
+        .btn-primary {
+            background-color: var(--color-success);
+            border-color: var(--color-success);
+        }
+        
+        .btn-primary:hover, .btn-primary:focus {
+            background-color: #269543;
+            border-color: #269543;
+        }
+        
+        .chart-container {
+            position: relative;
+            height: 300px;
+            margin-bottom: 30px;
+        }
+        
+        .repo-card {
+            border: 1px solid var(--color-border);
+            border-radius: var(--color-border-radius);
+            background-color: var(--color-bg-default);
+            margin-bottom: 20px;
+            padding: 20px;
+            transition: background-color 0.3s ease, border-color 0.3s ease;
+        }
+        
+        .stat-card {
+            border: 1px solid var(--color-border);
+            border-radius: var(--color-border-radius);
+            padding: 15px;
+            margin-bottom: 15px;
+            background-color: var(--color-bg-secondary);
+            text-align: center;
+        }
+        
+        .stat-card h5 {
+            font-weight: 400;
+            color: var(--color-text-secondary);
+            font-size: 14px;
+            margin-bottom: 5px;
+        }
+        
+        .stat-card h3 {
+            font-weight: 600;
+            color: var(--color-text-primary);
+            margin-bottom: 0;
+        }
+        
+        .loading {
+            display: none;
+            text-align: center;
+            margin: 20px 0;
+        }
+        
+        #error-message {
+            display: none;
+            color: var(--color-danger);
+            margin: 10px 0;
+            padding: 8px 12px;
+            background-color: var(--color-bg-secondary);
+            border: 1px solid var(--color-danger);
+            border-radius: var(--color-border-radius);
+            transition: background-color 0.3s ease, border-color 0.3s ease;
+        }
+        
+        [data-theme="dark"] #error-message {
+            background-color: rgba(248, 81, 73, 0.1);
+        }
+        
+        [data-theme="light"] #error-message {
+            background-color: #ffeef0;
+            border-color: #ffdce0;
+        }
+        
+        .contributor-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            margin-right: 10px;
+        }
+        
+        #loading-message {
+            margin-top: 10px;
+            color: var(--color-text-secondary);
+        }
+        
+        .progress {
+            height: 8px;
+            margin-top: 15px;
+            margin-bottom: 5px;
+            border-radius: 3px;
+            background-color: #eaecef;
+        }
+        
+        .progress-bar {
+            background-color: var(--color-link);
+        }
+        
+        .list-group-item {
+            border-color: var(--color-border);
+            padding: 12px 16px;
+            background-color: var(--color-bg-default);
+            color: var(--color-text-primary);
+            transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+        }
+        
+        .list-group-item strong {
+            color: var(--color-link);
+        }
+        
+        #status-messages {
+            color: var(--color-text-secondary);
+            font-size: 14px;
+        }
+        
+        /* Repo name styling like GitHub */
+        #repo-name {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        
+        #repo-description {
+            font-size: 16px;
+            color: var(--color-text-secondary);
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-dark">
+        <div class="container">
+            <a class="navbar-brand" href="#">
+                <svg height="32" viewBox="0 0 16 16" version="1.1" width="32" aria-hidden="true" class="me-2" style="fill: white;">
+                    <path fill-rule="evenodd" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path>
+                </svg>
+                GitHub Repository Analyzer
+            </a>
+            <div>
+                <button id="theme-toggle" class="btn btn-sm btn-outline-light" aria-label="Toggle theme">
+                    <svg id="theme-toggle-dark-icon" class="theme-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M8 11a3 3 0 1 1 0-6 3 3 0 0 1 0 6zm0 1a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM8 0a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-1 0v-2A.5.5 0 0 1 8 0zm0 13a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-1 0v-2A.5.5 0 0 1 8 13zm8-5a.5.5 0 0 1-.5.5h-2a.5.5 0 0 1 0-1h2a.5.5 0 0 1 .5.5zM3 8a.5.5 0 0 1-.5.5h-2a.5.5 0 0 1 0-1h2A.5.5 0 0 1 3 8zm10.657-5.657a.5.5 0 0 1 0 .707l-1.414 1.415a.5.5 0 1 1-.707-.708l1.414-1.414a.5.5 0 0 1 .707 0zm-9.193 9.193a.5.5 0 0 1 0 .707L3.05 13.657a.5.5 0 0 1-.707-.707l1.414-1.414a.5.5 0 0 1 .707 0zm9.193 2.121a.5.5 0 0 1-.707 0l-1.414-1.414a.5.5 0 0 1 .707-.707l1.414 1.414a.5.5 0 0 1 0 .707zM4.464 4.465a.5.5 0 0 1-.707 0L2.343 3.05a.5.5 0 1 1 .707-.707l1.414 1.414a.5.5 0 0 1 0 .708z"/>
+                    </svg>
+                    <svg id="theme-toggle-light-icon" class="theme-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="currentColor" style="display: none;">
+                        <path d="M6 .278a.768.768 0 0 1 .08.858 7.208 7.208 0 0 0-.878 3.46c0 4.021 3.278 7.277 7.318 7.277.527 0 1.04-.055 1.533-.16a.787.787 0 0 1 .81.316.733.733 0 0 1-.031.893A8.349 8.349 0 0 1 8.344 16C3.734 16 0 12.286 0 7.71 0 4.266 2.114 1.312 5.124.06A.752.752 0 0 1 6 .278z"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <div class="row">
+            <div class="col-md-8 offset-md-2">
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        <h4 class="mb-0">Analyze GitHub Repository</h4>
+                    </div>
+                    <div class="card-body">
+                        <form id="repo-form">
+                            <div class="mb-3">
+                                <label for="repo-input" class="form-label">Repository Name (owner/repo)</label>
+                                <input type="text" class="form-control" id="repo-input" 
+                                       placeholder="e.g. facebook/react" required>
+                                <div class="form-text">Enter the repository name in the format 'owner/repo'</div>
+                            </div>
+                            <button type="submit" class="btn btn-primary">Analyze Repository</button>
+                        </form>
+                        <div id="error-message" class="mt-3"></div>
+                        <div class="loading" id="loading">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p id="loading-message">Analyzing repository data. This may take a moment...</p>
+                            <div class="progress">
+                                <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%;" id="loading-progress"></div>
+                            </div>
+                            <div id="status-messages" class="mt-2 text-muted small">
+                                <div>Fetching repository information...</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="results" class="mt-4" style="display: none;">
+            <div class="row">
+                <div class="col-md-12">
+                    <div class="repo-card bg-light">
+                        <h2 id="repo-name"></h2>
+                        <p id="repo-description" class="text-muted"></p>
+                        <div class="row">
+                            <div class="col-md-3">
+                                <div class="stat-card">
+                                    <h5>Stars</h5>
+                                    <h3 id="repo-stars">0</h3>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="stat-card">
+                                    <h5>Forks</h5>
+                                    <h3 id="repo-forks">0</h3>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="stat-card">
+                                    <h5>Open Issues</h5>
+                                    <h3 id="repo-issues">0</h3>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="stat-card">
+                                    <h5>Watchers</h5>
+                                    <h3 id="repo-watchers">0</h3>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row mt-4">
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="card-title">Language Distribution</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="chart-container">
+                                <canvas id="languages-chart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="card-title">Commit Activity</h5>
+                            <span id="commit-sampling-info" class="badge bg-info text-white d-none" style="font-size: 0.7rem;">Data sampled for performance</span>
+                        </div>
+                        <div class="card-body">
+                            <div class="chart-container">
+                                <canvas id="commits-chart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row mt-4">
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="card-title">Top Contributors</h5>
+                        </div>
+                        <div class="card-body">
+                            <ul class="list-group" id="contributors-list"></ul>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="card-title">Issue Statistics</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="chart-container">
+                                <canvas id="issues-chart"></canvas>
+                            </div>
+                            <div id="performance-info" class="mt-3 small text-muted d-none">
+                                <div class="alert alert-info">
+                                    <i class="fas fa-info-circle"></i> Analysis time: <span id="analysis-time">0</span> seconds
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // DOM elements
+        const repoForm = document.getElementById('repo-form');
+        const repoInput = document.getElementById('repo-input');
+        const loadingElement = document.getElementById('loading');
+        const loadingMessage = document.getElementById('loading-message');
+        const loadingProgress = document.getElementById('loading-progress');
+        const resultsElement = document.getElementById('results');
+        const errorMessage = document.getElementById('error-message');
+        const themeToggleBtn = document.getElementById('theme-toggle');
+        const darkIcon = document.getElementById('theme-toggle-dark-icon');
+        const lightIcon = document.getElementById('theme-toggle-light-icon');
+        
+        // Theme handling
+        function setTheme(theme) {
+            document.documentElement.setAttribute('data-theme', theme);
+            localStorage.setItem('theme', theme);
+            
+            // Toggle icon visibility
+            if (theme === 'dark') {
+                darkIcon.style.display = 'none';
+                lightIcon.style.display = 'inline';
+            } else {
+                darkIcon.style.display = 'inline';
+                lightIcon.style.display = 'none';
+            }
+            
+            // Update charts if they exist
+            updateChartsForTheme(theme);
+        }
+        
+        function updateChartsForTheme(theme) {
+            const isDark = theme === 'dark';
+            const textColor = isDark ? '#c9d1d9' : '#24292e';
+            const gridColor = isDark ? '#30363d' : '#eaecef';
+            const secondaryTextColor = isDark ? '#8b949e' : '#586069';
+            
+            // Update charts if they exist with new theme colors
+            if (commitsChart) {
+                commitsChart.options.scales.y.grid.color = gridColor;
+                commitsChart.options.scales.x.grid.color = gridColor;
+                commitsChart.options.scales.y.ticks.color = secondaryTextColor;
+                commitsChart.options.scales.x.ticks.color = secondaryTextColor;
+                commitsChart.options.plugins.legend.labels.color = textColor;
+                commitsChart.update();
+            }
+            
+            if (issuesChart) {
+                issuesChart.options.plugins.legend.labels.color = textColor;
+                issuesChart.update();
+            }
+            
+            if (languagesChart) {
+                languagesChart.options.plugins.legend.labels.color = textColor;
+                languagesChart.update();
+            }
+        }
+        
+        // Check for saved theme preference or use system preference
+        const savedTheme = localStorage.getItem('theme');
+        if (savedTheme) {
+            setTheme(savedTheme);
+        } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            // If no saved preference, use system preference
+            setTheme('dark');
+        }
+        
+        // Add event listener for theme toggle button
+        themeToggleBtn.addEventListener('click', () => {
+            const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
+            const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+            setTheme(newTheme);
+        });
+        
+        // Charts
+        let languagesChart = null;
+        let commitsChart = null;
+        let issuesChart = null;
+
+        // Event listeners
+        repoForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const repoName = repoInput.value.trim();
+            if (!repoName) return;
+
+            // Show loading state
+            loadingElement.style.display = 'block';
+            errorMessage.style.display = 'none';
+            resultsElement.style.display = 'none';
+            
+            // Start progress animation
+            startProgressAnimation();
+            
+            try {
+                // Create an AbortController for timeout
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 120000); // 2-minute timeout
+                
+                // Make API request to analyze repository
+                const response = await fetch('/api/analyze', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ repo_name: repoName }),
+                    signal: controller.signal
+                });
+                
+                // Clear the timeout
+                clearTimeout(timeoutId);
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Failed to analyze repository');
+                }
+                
+                const data = await response.json();
+                // Stop the progress animation
+                stopProgressAnimation();
+                // Display the results
+                displayResults(data);
+            } catch (error) {
+                // Stop the progress animation
+                stopProgressAnimation();
+                console.error('Error analyzing repository:', error);
+                let errorMsg = error.message || 'Error analyzing repository';
+                if (error.name === 'AbortError') {
+                    errorMsg = 'The analysis took too long and was aborted. Try a smaller repository or try again later.';
+                }
+                errorMessage.textContent = errorMsg;
+                errorMessage.style.display = 'block';
+            } finally {
+                loadingElement.style.display = 'none';
+            }
+        });
+        
+        // Variables for progress animation
+        let progressInterval;
+        let currentProgress = 0;
+        let statusInterval;
+        const statusMessages = [
+            "Fetching repository information...",
+            "Analyzing commit history...",
+            "Processing contributor data...",
+            "Calculating language statistics...",
+            "Analyzing issue reports...",
+            "Generating visualizations...",
+            "Almost done, finalizing results..."
+        ];
+        let currentStatusIndex = 0;
+        
+        function startProgressAnimation() {
+            // Reset progress
+            currentProgress = 0;
+            currentStatusIndex = 0;
+            updateLoadingProgress(currentProgress);
+            updateStatusMessage(statusMessages[0]);
+            
+            // Simulate progress
+            progressInterval = setInterval(() => {
+                // Increment progress, but slow down as it approaches 90%
+                if (currentProgress < 30) {
+                    currentProgress += 5;
+                } else if (currentProgress < 60) {
+                    currentProgress += 3;
+                } else if (currentProgress < 85) {
+                    currentProgress += 1;
+                } else if (currentProgress < 90) {
+                    currentProgress += 0.5;
+                }
+                
+                // Cap at 90% (the last 10% is when we get the response)
+                if (currentProgress > 90) {
+                    currentProgress = 90;
+                }
+                
+                updateLoadingProgress(Math.floor(currentProgress));
+            }, 800);
+            
+            // Update status messages periodically
+            statusInterval = setInterval(() => {
+                currentStatusIndex = (currentStatusIndex + 1) % statusMessages.length;
+                updateStatusMessage(statusMessages[currentStatusIndex]);
+            }, 5000);
+        }
+        
+        function stopProgressAnimation() {
+            clearInterval(progressInterval);
+            clearInterval(statusInterval);
+            updateLoadingProgress(100);
+            updateStatusMessage("Analysis complete!");
+        }
+        
+        function updateLoadingProgress(percentage) {
+            loadingProgress.style.width = `${percentage}%`;
+            loadingMessage.textContent = `Analyzing repository data. This may take a moment... (${percentage}%)`;
+        }
+        
+        function updateStatusMessage(message) {
+            document.getElementById('status-messages').innerHTML = `<div>${message}</div>`;
+        }
+
+        function displayResults(data) {
+            // Display repository info
+            document.getElementById('repo-name').textContent = data.overview.repository.full_name;
+            document.getElementById('repo-description').textContent = data.overview.repository.description || 'No description available';
+            document.getElementById('repo-stars').textContent = data.overview.repository.stars;
+            document.getElementById('repo-forks').textContent = data.overview.repository.forks;
+            document.getElementById('repo-issues').textContent = data.overview.repository.open_issues;
+            document.getElementById('repo-watchers').textContent = data.overview.repository.watchers;
+            
+            // Display languages chart
+            displayLanguagesChart(data.languages.languages);
+            
+            // Display commits chart
+            displayCommitsChart(data.commits.daily_commits);
+            
+            // Check if commits were sampled and show indicator if they were
+            const commitSamplingInfo = document.getElementById('commit-sampling-info');
+            if (data.commits.is_sampled) {
+                commitSamplingInfo.classList.remove('d-none');
+                commitSamplingInfo.title = `Due to the large number of commits (${data.commits.total_commits}), data was sampled for better performance`;
+            } else {
+                commitSamplingInfo.classList.add('d-none');
+            }
+            
+            // Display issues chart
+            displayIssuesChart(data.issues);
+            
+            // Display contributors
+            displayContributors(data.overview.contributors);
+            
+            // Show analysis time if available
+            const performanceInfo = document.getElementById('performance-info');
+            const analysisTime = document.getElementById('analysis-time');
+            if (data.analysis_time) {
+                analysisTime.textContent = data.analysis_time;
+                performanceInfo.classList.remove('d-none');
+            } else {
+                performanceInfo.classList.add('d-none');
+            }
+            
+            // Show results
+            resultsElement.style.display = 'block';
+        }
+
+        function displayLanguagesChart(languages) {
+            const ctx = document.getElementById('languages-chart').getContext('2d');
+            
+            // Destroy existing chart if it exists
+            if (languagesChart) languagesChart.destroy();
+            
+            const labels = languages.map(lang => lang.language);
+            const data = languages.map(lang => lang.percentage);
+            const backgroundColors = generateColors(languages.length);
+            
+            languagesChart = new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: data,
+                        backgroundColor: backgroundColors,
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'right'
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return `${context.label}: ${context.raw.toFixed(1)}%`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function displayCommitsChart(commitData) {
+            const ctx = document.getElementById('commits-chart').getContext('2d');
+            
+            // Destroy existing chart if it exists
+            if (commitsChart) commitsChart.destroy();
+            
+            // Format dates and extract counts
+            const dates = commitData.map(item => {
+                const date = new Date(item.date);
+                return date.toLocaleDateString();
+            });
+            
+            const counts = commitData.map(item => item.count);
+            
+            commitsChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: dates,
+                    datasets: [{
+                        label: 'Commits',
+                        data: counts,
+                        borderColor: '#0366d6', // GitHub blue
+                        backgroundColor: 'rgba(3, 102, 214, 0.1)',
+                        tension: 0.1,
+                        fill: true,
+                        pointBackgroundColor: '#0366d6'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                precision: 0,
+                                color: '#586069' // GitHub secondary text color
+                            },
+                            grid: {
+                                color: '#eaecef' // GitHub grid line color
+                            }
+                        },
+                        x: {
+                            ticks: {
+                                color: '#586069' // GitHub secondary text color
+                            },
+                            grid: {
+                                color: '#eaecef' // GitHub grid line color
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            labels: {
+                                color: '#24292e' // GitHub primary text color
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: '#24292e',
+                            titleColor: '#ffffff',
+                            bodyColor: '#ffffff',
+                            borderColor: '#444d56',
+                            borderWidth: 1
+                        }
+                    }
+                }
+            });
+        }
+
+        function displayIssuesChart(issuesData) {
+            const ctx = document.getElementById('issues-chart').getContext('2d');
+            
+            // Destroy existing chart if it exists
+            if (issuesChart) issuesChart.destroy();
+            
+            issuesChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Open Issues', 'Closed Issues'],
+                    datasets: [{
+                        data: [issuesData.open_issues, issuesData.closed_issues],
+                        backgroundColor: ['#28a745', '#0366d6'], // GitHub green and blue
+                        borderWidth: 2,
+                        borderColor: '#ffffff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                            labels: {
+                                color: '#24292e', // GitHub primary text color
+                                font: {
+                                    family: '-apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif'
+                                }
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: '#24292e',
+                            titleColor: '#ffffff',
+                            bodyColor: '#ffffff',
+                            borderColor: '#444d56',
+                            borderWidth: 1,
+                            callbacks: {
+                                label: function(context) {
+                                    const value = context.raw;
+                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                    const percentage = total > 0 ? Math.round((value / total) * 100) : 0;
+                                    return `${context.label}: ${value} (${percentage}%)`;
+                                }
+                            }
+                        }
+                    },
+                    cutout: '60%'
+                }
+            });
+        }
+
+        function displayContributors(contributors) {
+            const listElement = document.getElementById('contributors-list');
+            listElement.innerHTML = '';
+            
+            contributors.forEach(contributor => {
+                const item = document.createElement('li');
+                item.className = 'list-group-item d-flex align-items-center';
+                
+                item.innerHTML = `
+                    <img src="${contributor.avatar_url}" alt="${contributor.login}" class="contributor-avatar">
+                    <div class="w-100">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <strong><a href="${contributor.url}" target="_blank" style="color: var(--color-link); text-decoration: none;">${contributor.login}</a></strong>
+                            <span class="badge bg-secondary rounded-pill">${contributor.contributions}</span>
+                        </div>
+                        <div class="text-muted small">
+                            <span class="contribution-bar" style="display: inline-block; width: ${Math.min(contributor.contributions / 5, 100)}%; max-width: 100%; height: 4px; background-color: var(--color-success); border-radius: 2px;"></span>
+                        </div>
+                    </div>
+                `;
+                
+                listElement.appendChild(item);
+            });
+        }
+
+        function generateColors(count) {
+            // GitHub-inspired color palette
+            const colors = [
+                '#0366d6', // GitHub blue
+                '#28a745', // GitHub green
+                '#6f42c1', // GitHub purple
+                '#d73a49', // GitHub red
+                '#f9826c', // GitHub coral
+                '#e36209', // GitHub orange
+                '#6a737d', // GitHub gray
+                '#24292e', // GitHub dark gray
+                '#005cc5', // GitHub medium blue
+                '#22863a'  // GitHub medium green
+            ];
+            
+            if (count <= colors.length) {
+                return colors.slice(0, count);
+            }
+            
+            // Generate additional colors if needed
+            const result = [...colors];
+            for (let i = colors.length; i < count; i++) {
+                // Generate colors in the GitHub palette range
+                const hue = Math.floor(Math.random() * 360);
+                const saturation = Math.floor(Math.random() * 30) + 50; // 50-80%
+                const lightness = Math.floor(Math.random() * 20) + 40;  // 40-60%
+                result.push(`hsl(${hue}, ${saturation}%, ${lightness}%)`);
+            }
+            
+            return result;
+        }
+
+        function updateLoadingProgress(percentage) {
+            loadingProgress.style.width = `${percentage}%`;
+            loadingMessage.textContent = `Analyzing repository data. This may take a moment... (${percentage}%)`;
+        }
+        
+        function updateStatusMessage(message) {
+            document.getElementById('status-messages').innerHTML = `<div>${message}</div>`;
+        }
+    </script>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
